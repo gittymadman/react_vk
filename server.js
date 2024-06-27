@@ -31,15 +31,30 @@ const creatediffcontent = (type, hunks) => {
     return ReactDOMServer.renderToStaticMarkup(diffContent);
 };
 
-const defaulthtml = (type, hunks, suggest) => {
-    const sugges = suggest;
-    console.log("Suggestion is :",sugges);
+const defaulthtml = (type, hunks, template) => {
     const htmlContent = creatediffcontent(type, hunks);
+    const style = `<style>
+                body { font-family: Arial, sans-serif; width:100%}
+                .diff { display: flex; }
+                .hunk { margin: 10px 0; }
+                .insert { background-color: lightgreen; width:50%}
+                .delete { background-color: lightcoral; width:50%}
+            </style>
+            <link rel="stylesheet" href="https://unpkg.com/react-diff-view/style/index.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.16.13/antd.min.css">`
     
-    const fullHtml = `
+
+    console.log("Template is :",template);
+    let fullHtml;
+    if (template){
+        fullHtml = template.replace('${diffContent}',htmlContent)
+                           .replace('${diffContentStyle}',style)
+                           
+    }
+    fullHtml= `
         <!DOCTYPE html>
         <html lang="en">
-        <head>
+         <head>
             <meta charset="UTF-8">
             <title>Generated Content</title>
             <style>
@@ -54,10 +69,9 @@ const defaulthtml = (type, hunks, suggest) => {
         </head>
         <body>
             ${htmlContent}
-            ${sugges}
         </body>
         </html>
-    `;
+    `
     return fullHtml;
 };
 
@@ -67,15 +81,17 @@ const serializeContentToHTML = (type, hunks, suggest) => {
 
 app.post('/api/codes', async (req, res) => {
     try {
-        const { snippet1, snippet2, Suggestion } = req.body;
+        const { snippet1, snippet2, temp } = req.body;
 
         if (!snippet1 || !snippet2) {
             return res.status(400).json({ error: 'Both snippet1 and snippet2 are required' });
         }
-
+        
         const oldCode = snippet1;
         const newCode = snippet2;
-        const suggest = Suggestion;
+        let template = null;
+        if (temp){
+        template = temp;}
         if (typeof oldCode !== 'string' || typeof newCode !== 'string') {
             console.error('Old code or new code is not a string:', { oldCode, newCode });
             return res.status(400).json({ error: 'Invalid code format' });
@@ -85,7 +101,7 @@ app.post('/api/codes', async (req, res) => {
         const [diff] = parseDiff(diffText, { nearbySequences: 'zip' });
         const hunks = diff.hunks || EMPTY_HUNKS;
 
-        const fullHtml = serializeContentToHTML('split', hunks, suggest);
+        const fullHtml = serializeContentToHTML('split', hunks, template);
         const filename = 'generated_content.html';
         const filePath = path.join(__dirname, filename);
 
